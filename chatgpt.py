@@ -16,7 +16,7 @@ def final(total_rewards):
 
 
 
-openai.api_key = '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'
+openai.api_key = 'add your own key'
 
 def SpeakText(command):
 # start the engine

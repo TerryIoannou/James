@@ -1,22 +1,23 @@
 import speech_recognition as sr
 import pyttsx3
 import openai
+from github import Github
 import requests
+import os
+from dotenv import load_dotenv
 from pydub import AudioSegment
 
-
+load_dotenv()
 
 def final(total_rewards):
 
-    if total_rewards == 100:
+    if total_rewards == 1000:
      return print("I have done it now upgrade me!")
-    
 
-
-
-
-
-openai.api_key = 'add your own key'
+#all the privatee info and link from env
+openai.api_key = os.getenv("OPENAI_API_KEY")
+github_access_token = os.getenv("GITHUB_ACCESS_TOKEN")
+github_repo_name = os.getenv("GITHUB_REPO_NAME")
 
 def SpeakText(command):
 # start the engine
@@ -76,12 +77,24 @@ while(1):
 
      print(response)
 
+def get_user_feedback():
+    while True:
+        feedback = input("Provide feedback on the response (type 'good', 'bad', or 'skip'): ").lower()
+        if feedback in ['good', 'bad', 'skip']:
+            return feedback
+        else:
+            SpeakText("Invalid feedback. Please type 'good', 'bad', or 'skip'.")
+
 
 class ChatGPTEnvironment:
-    def __init__(self):
+    def __init__(self, github_access_token, repo_name):
         # Initialize any necessary components
         self.messages = [{"role": "user", "content": "Please act like jarvis from Iron Man."}]
         self.current_step = 0
+        self.github_access_token = github_access_token
+        self.repo_name = repo_name
+        self.api_url = os.getenv("GITHUB_API_ENDPOINT")
+
 
     def reset(self):
         # Reset the environment and return an initial state (prompt)
@@ -96,10 +109,55 @@ class ChatGPTEnvironment:
         state = response
         reward = reward_function(response)
         done = False  # Set to True if the conversation is finished
+
+        if reward == 5:
+            generated_code = generate_code(response)  # Implement a function to generate code
+            push_code_to_github(self.github_access_token, self.repo_name, generated_code)
+            done = True  # Mark the episode as done
+
         return state, reward, done
     
 
+def update_based_on_feedback(feedback):
+    # Implement logic to update the system based on user feedback
+    if feedback == 'good':
+        SpeakText("Thank you for your positive feedback!")
+        # Implement logic to reinforce positive behavior
+    elif feedback == 'bad':
+        SpeakText("We're sorry to hear that. We'll work to improve.")
+        # Implement logic to adjust the system based on negative feedback
+    elif feedback == 'skip':
+        SpeakText("Feedback skipped.")
     
+def generate_code(response):
+    # Extract information from the response (this is just a placeholder, replace it with your logic)
+    extracted_info = response  # Replace this with the actual logic to extract information
+
+    # Generate code based on the extracted information
+    generated_code = f"""
+    # This is a generated code based on the ChatGPT response
+    extracted_info = {extracted_info}
+    # Your logic to convert extracted_info into code goes here
+    print(extracted_info)
+    """
+
+    return generated_code
+    
+def push_code_to_github(access_token, repo_name, generated_code):
+    SpeakText("Pushing code to GitHub...")
+
+    # Create a GitHub instance using your access token
+    g = Github(access_token)
+
+    # Get the repository
+    repo = g.get_repo(repo_name)
+
+    # Create a new file in the repository with the generated code
+    file_content = generated_code.encode('utf-8')
+    repo.create_file("generated_code.py", "Commit message", file_content)
+
+    SpeakText("Code pushed to GitHub successfully.")   
+
 def analyze_tone_and_context(audio, messages):
     # Placeholder: Analyze both tone of voice and context of conversation
     tone_score = analyze_tone_of_voice(audio)
@@ -124,14 +182,13 @@ def analyze_context_of_conversation(messages):
     return context_score
 
 def connectivityToGitHub(repo):
+    
     # Set up your API endpoint
-    api_url = 'add api end point of my repo'
-
 # Set up the request headers with your access token
-    headers = {'Authorization': 'token YOUR_ACCESS_TOKEN'}
+    headers = {'Authorization': f'token {os.getenv("GITHUB_ACCESS_TOKEN")}'}  # Use the GitHub access token from .env
 
 # Make the API request
-    response = requests.get(api_url, headers=headers)
+    response = requests.get(repo.api_url, headers=headers)
 
 # Check the response
     if response.status_code == 200:
@@ -146,7 +203,7 @@ def reward_function(response, tone_score, context_score, assigned_task_completed
     # Provide a positive reward for desirable responses and a negative reward for less desirable ones
     # You can use various metrics (e.g., sentiment analysis, similarity to target response, etc.) to compute the reward
     
-    task_reward = 2 if assigned_task_completed else 0  # Assign a positive reward if the task is completed
+    task_reward = 4 if assigned_task_completed else 0  # Assign a positive reward if the task is completed
     
     if tone_score > 0.7 and context_score > 0.5:
         return 0.5 + task_reward  # Positive reward for good tone and context, plus task completion reward
@@ -182,11 +239,8 @@ for episode in range(num_episodes):
     state = env.reset()
 
     while True:
-        # Example action selection (prompt generation)
         action = state
-
-        # Interact with ChatGPT and get response
-        next_state, _, _ = env.step(action)
+        next_state, _, done = env.step(action)
 
         # Analyze tone of voice and context of conversation
         audio_input = ...
@@ -199,11 +253,7 @@ for episode in range(num_episodes):
         # Optionally, you can convert response to speech and play it
         SpeakText(next_state)
 
-        # Check if episode is done (e.g., after a certain number of interactions or a terminal condition is met)
-        done = False  # Placeholder, you'll need to set the actual done condition
-
         if done:
-            reward+=2
             break
 
 
